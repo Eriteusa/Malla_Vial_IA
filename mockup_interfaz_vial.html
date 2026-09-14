@@ -1,0 +1,634 @@
+<title>Clasificador Vial Sumapaz</title>
+<style>
+  :root {
+    --bg: #eef0ee;
+    --surface: #ffffff;
+    --surface-sunken: #e3e6e4;
+    --border: #ccd1cf;
+    --ink: #14171a;
+    --ink-muted: #565f5c;
+    --ink-faint: #7c8582;
+    --accent: #2f5f86;
+    --accent-strong: #1f4763;
+    --accent-ink: #f4f8fb;
+    --good: #2f7d54;
+    --good-bg: #e2efe7;
+    --warn: #a97418;
+    --warn-bg: #f3e9d6;
+    --bad: #ad3a2c;
+    --bad-bg: #f5e0dc;
+    --focus: #2f5f86;
+    --font-body: "Overpass", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-display: "Overpass", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-mono: "Overpass Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+    --sky-a: #dcecf5;
+    --sky-b: #f3f8f1;
+    --hill-back: #90b088;
+    --hill-front: #628f5c;
+    --road: #b98a5c;
+    --road-line: #f4ead0;
+    --tree: #4c7a49;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: linear-gradient(180deg, #eef4f2 0%, var(--bg) 55%);
+    color: var(--ink);
+    font-family: var(--font-body);
+    margin: 0;
+    padding-inline: 20px;
+    padding-block: 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+  }
+
+  h1, h2, h3 { text-wrap: balance; margin: 0; }
+
+  .page {
+    width: 100%;
+    max-width: 760px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 4%, transparent);
+  }
+
+  .panel-head {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    text-align: center;
+  }
+
+  .panel-head h1 {
+    font-family: var(--font-display);
+    font-size: 38px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    text-transform: capitalize;
+  }
+
+  .subtitle {
+    font-size: 15.5px;
+    color: var(--ink-muted);
+    line-height: 1.6;
+    margin: 0;
+    max-width: 42ch;
+  }
+
+  .subtitle .accent-word {
+    color: var(--accent-strong);
+    font-weight: 600;
+  }
+
+  .panel-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    align-items: start;
+  }
+
+  @media (max-width: 640px) {
+    .panel-body { grid-template-columns: 1fr; }
+    .panel { padding: 24px; }
+  }
+
+  .upload-col, .result-col {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .frame {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    width: 100%;
+    border-radius: 10px;
+    border: 1.5px dashed var(--border);
+    background: var(--surface-sunken);
+    overflow: hidden;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .frame:focus-visible, .btn-primary:focus-visible, .btn-ghost:focus-visible, .demo-buttons button:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .frame[data-filled="true"] {
+    border-style: solid;
+    cursor: default;
+  }
+
+  .frame-placeholder {
+    position: absolute;
+    inset: 0;
+  }
+
+  .placeholder-illustration {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .placeholder-cta {
+    position: absolute;
+    left: 50%;
+    bottom: 16px;
+    transform: translateX(-50%);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 16px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--ink) 14%, transparent);
+    color: var(--ink);
+    font-size: 15.5px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .placeholder-cta svg { width: 19px; height: 19px; stroke: var(--accent-strong); flex-shrink: 0; }
+
+  .frame-example {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .frame-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .frame-loading {
+    position: absolute;
+    inset: 0;
+    background: color-mix(in srgb, var(--surface) 72%, transparent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-direction: column;
+  }
+
+  .spinner {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 3px solid color-mix(in srgb, var(--accent) 25%, transparent);
+    border-top-color: var(--accent);
+    animation: spin 0.8s linear infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .spinner { animation: none; border-top-color: color-mix(in srgb, var(--accent) 25%, transparent); }
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .frame-loading span {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-muted);
+  }
+
+  .upload-actions {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .btn-ghost {
+    font-family: var(--font-body);
+    font-size: 13.5px;
+    font-weight: 500;
+    background: transparent;
+    color: var(--accent);
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .btn-ghost:hover { color: var(--accent-strong); text-decoration: underline; }
+
+  .caption {
+    font-size: 12px;
+    color: var(--ink-faint);
+    text-align: right;
+  }
+
+  .btn-primary {
+    font-family: var(--font-body);
+    font-size: 15.5px;
+    font-weight: 700;
+    background: var(--accent);
+    color: var(--accent-ink);
+    border: none;
+    border-radius: 8px;
+    padding: 12px 18px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background-color 120ms ease;
+  }
+
+  .btn-primary:hover:not(:disabled) { background: var(--accent-strong); }
+
+  .btn-primary:disabled {
+    background: var(--surface-sunken);
+    color: var(--ink-faint);
+    cursor: not-allowed;
+  }
+
+  .result {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .result-headline {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bad);
+    flex-shrink: 0;
+    transform: translateY(-1px);
+  }
+
+  .result-class {
+    font-family: var(--font-display);
+    font-size: 27px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+  }
+
+  .result-confidence {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--bad);
+    margin-left: auto;
+  }
+
+  .bars {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .bar-row {
+    display: grid;
+    grid-template-columns: 84px 1fr 46px;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .bar-label {
+    font-family: var(--font-body);
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--ink-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .bar-track {
+    height: 8px;
+    border-radius: 4px;
+    background: var(--surface-sunken);
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 400ms ease;
+  }
+
+  .bar-value {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 12.5px;
+    color: var(--ink-muted);
+    text-align: right;
+  }
+
+  .bar-row[data-active="true"] .bar-label,
+  .bar-row[data-active="true"] .bar-value {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .error-block {
+    border: 1px solid color-mix(in srgb, var(--bad) 40%, var(--border));
+    background: var(--bad-bg);
+    border-radius: 8px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .error-block strong {
+    font-size: 13.5px;
+    color: var(--bad);
+  }
+
+  .error-block p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--ink-muted);
+    line-height: 1.5;
+  }
+
+  .demo-controls {
+    width: 100%;
+    max-width: 760px;
+    border-top: 1px solid var(--border);
+    padding-top: 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .demo-label {
+    font-family: var(--font-body);
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--accent-strong);
+  }
+
+  .demo-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .demo-buttons button {
+    font-family: var(--font-body);
+    font-size: 12.5px;
+    color: var(--ink-muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 6px 14px;
+    cursor: pointer;
+  }
+
+  .demo-buttons button[data-active="true"] {
+    background: var(--accent);
+    color: var(--accent-ink);
+    border-color: var(--accent);
+  }
+
+  .demo-buttons button:hover:not([data-active="true"]) {
+    border-color: var(--ink-faint);
+    color: var(--ink);
+  }
+</style>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;500;600;700;800&family=Overpass+Mono:wght@400;500;600&display=swap">
+
+<div class="page">
+  <main class="panel">
+    <div class="panel-head">
+      <h1>Clasificador de estado vial</h1>
+      <p class="subtitle">Sube una foto de un tramo de vía del <span class="accent-word">Sumapaz</span> y el modelo te dice si está en buen estado, agrietada o con huecos.</p>
+    </div>
+
+    <div class="panel-body">
+      <section class="upload-col">
+        <div class="frame" id="frame" tabindex="0" role="button" aria-label="Subir una imagen de la vía">
+          <div class="frame-placeholder" id="framePlaceholder" hidden>
+            <svg class="placeholder-illustration" width="100%" height="100%" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice">
+              <defs>
+                <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="var(--sky-a)" />
+                  <stop offset="1" stop-color="var(--sky-b)" />
+                </linearGradient>
+              </defs>
+              <rect width="400" height="300" fill="url(#skyGrad)"></rect>
+              <path d="M0 185 Q100 150 210 172 T400 160 L400 300 L0 300 Z" fill="var(--hill-back)"></path>
+              <path d="M0 225 Q120 195 220 212 T400 202 L400 300 L0 300 Z" fill="var(--hill-front)"></path>
+              <circle cx="62" cy="158" r="17" fill="var(--tree)"></circle>
+              <circle cx="80" cy="168" r="12" fill="var(--tree)"></circle>
+              <rect x="67" y="172" width="7" height="22" fill="#7a5a3a"></rect>
+              <path d="M150 300 C168 244 186 222 199 210 C212 222 232 244 250 300 Z" fill="var(--road)"></path>
+              <path d="M199 300 C199 250 200 228 199 213" stroke="var(--road-line)" stroke-width="4" stroke-linecap="round" stroke-dasharray="10 10"></path>
+              <ellipse cx="206" cy="266" rx="15" ry="7" fill="#5a422b" opacity="0.55"></ellipse>
+            </svg>
+            <div class="placeholder-cta">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 16V4M12 4L7 9M12 4l5 5" />
+                <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" />
+              </svg>
+              <span>Sube una foto de la vía</span>
+            </div>
+          </div>
+
+          <svg class="frame-example" id="frameExample" width="100%" height="100%" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" hidden>
+            <rect width="400" height="300" fill="#dcecf5"></rect>
+            <path d="M0 185 Q100 150 210 172 T400 160 L400 300 L0 300 Z" fill="#90b088"></path>
+            <path d="M0 225 Q120 195 220 212 T400 202 L400 300 L0 300 Z" fill="#628f5c"></path>
+            <circle cx="62" cy="158" r="17" fill="#4c7a49"></circle>
+            <circle cx="80" cy="168" r="12" fill="#4c7a49"></circle>
+            <rect x="67" y="172" width="7" height="22" fill="#7a5a3a"></rect>
+            <path d="M150 300 C168 244 186 222 199 210 C212 222 232 244 250 300 Z" fill="#b98a5c"></path>
+            <path d="M199 300 C199 250 200 228 199 213" stroke="#f4ead0" stroke-width="4" stroke-linecap="round" stroke-dasharray="10 10"></path>
+            <ellipse cx="206" cy="255" rx="20" ry="10" fill="#171514"></ellipse>
+            <ellipse cx="206" cy="252" rx="15" ry="7" fill="#0d0b0a"></ellipse>
+          </svg>
+
+          <img class="frame-img" id="frameImg" hidden alt="Vista previa de la imagen subida">
+
+          <div class="frame-loading" id="frameLoading" hidden>
+            <div class="spinner"></div>
+            <span>Analizando imagen…</span>
+          </div>
+        </div>
+
+        <input type="file" id="fileInput" accept="image/*" hidden>
+
+        <div class="upload-actions">
+          <button type="button" class="btn-ghost" id="chooseBtn">Elegir imagen</button>
+          <span class="caption" id="imgCaption">Foto de ejemplo. Sube la tuya para reemplazarla.</span>
+        </div>
+      </section>
+
+      <section class="result-col">
+        <button type="button" class="btn-primary" id="predictBtn">Predecir</button>
+
+        <div class="result" id="resultBlock" hidden>
+          <div class="result-headline">
+            <span class="dot" id="resultDot"></span>
+            <span class="result-class" id="resultClass">Huecos</span>
+            <span class="result-confidence" id="resultConfidence">87.4%</span>
+          </div>
+
+          <div class="bars" id="bars">
+            <div class="bar-row" data-class="buen_estado">
+              <span class="bar-label">Buen estado</span>
+              <div class="bar-track"><div class="bar-fill" style="width: 2.1%; background: var(--good);"></div></div>
+              <span class="bar-value">2.1%</span>
+            </div>
+            <div class="bar-row" data-class="grietas">
+              <span class="bar-label">Grietas</span>
+              <div class="bar-track"><div class="bar-fill" style="width: 10.5%; background: var(--warn);"></div></div>
+              <span class="bar-value">10.5%</span>
+            </div>
+            <div class="bar-row" data-class="huecos" data-active="true">
+              <span class="bar-label">Huecos</span>
+              <div class="bar-track"><div class="bar-fill" style="width: 87.4%; background: var(--bad);"></div></div>
+              <span class="bar-value">87.4%</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="error-block" id="errorBlock" hidden>
+          <strong>No se pudo procesar la imagen</strong>
+          <p>Verifica que el archivo sea una foto válida (JPG o PNG) y que el servidor backend esté disponible en localhost:8000.</p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <section class="demo-controls">
+    <span class="demo-label">Estados de la interfaz</span>
+    <div class="demo-buttons" id="demoButtons">
+      <button type="button" data-demo="empty">Vacío</button>
+      <button type="button" data-demo="ready">Imagen lista</button>
+      <button type="button" data-demo="loading">Prediciendo</button>
+      <button type="button" data-demo="result" data-active="true">Resultado</button>
+      <button type="button" data-demo="error">Error</button>
+    </div>
+  </section>
+</div>
+
+<script>
+  const frame = document.getElementById('frame');
+  const framePlaceholder = document.getElementById('framePlaceholder');
+  const frameExample = document.getElementById('frameExample');
+  const frameImg = document.getElementById('frameImg');
+  const frameLoading = document.getElementById('frameLoading');
+  const fileInput = document.getElementById('fileInput');
+  const chooseBtn = document.getElementById('chooseBtn');
+  const imgCaption = document.getElementById('imgCaption');
+  const predictBtn = document.getElementById('predictBtn');
+  const resultBlock = document.getElementById('resultBlock');
+  const errorBlock = document.getElementById('errorBlock');
+  const demoButtons = document.getElementById('demoButtons');
+
+  let hasUserImage = false;
+  let currentState = 'result';
+
+  function setState(state) {
+    currentState = state;
+    const filled = state !== 'empty';
+
+    framePlaceholder.hidden = filled;
+    frame.dataset.filled = String(filled);
+
+    if (filled && hasUserImage) {
+      frameImg.hidden = false;
+      frameExample.hidden = true;
+    } else if (filled) {
+      frameImg.hidden = true;
+      frameExample.hidden = false;
+    } else {
+      frameImg.hidden = true;
+      frameExample.hidden = true;
+    }
+
+    frameLoading.hidden = state !== 'loading';
+    resultBlock.hidden = state !== 'result';
+    errorBlock.hidden = state !== 'error';
+
+    predictBtn.disabled = state === 'empty' || state === 'loading';
+    predictBtn.textContent = state === 'loading'
+      ? 'Prediciendo…'
+      : (state === 'result' || state === 'error') ? 'Predecir de nuevo' : 'Predecir';
+
+    if (!hasUserImage) {
+      imgCaption.textContent = state === 'empty'
+        ? 'Sube una foto del tramo de vía para analizar.'
+        : 'Foto de ejemplo. Sube la tuya para reemplazarla.';
+    }
+
+    for (const btn of demoButtons.querySelectorAll('button')) {
+      btn.dataset.active = String(btn.dataset.demo === state);
+    }
+  }
+
+  frame.addEventListener('click', () => fileInput.click());
+  frame.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+  });
+  chooseBtn.addEventListener('click', () => fileInput.click());
+
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    hasUserImage = true;
+    frameImg.src = URL.createObjectURL(file);
+    imgCaption.textContent = file.name;
+    resultBlock.hidden = true;
+    errorBlock.hidden = true;
+    setState('ready');
+  });
+
+  predictBtn.addEventListener('click', () => {
+    if (predictBtn.disabled) return;
+    setState('loading');
+    window.setTimeout(() => setState('result'), 900);
+  });
+
+  demoButtons.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-demo]');
+    if (!btn) return;
+    if (btn.dataset.demo === 'empty') hasUserImage = false;
+    setState(btn.dataset.demo);
+  });
+
+  setState('result');
+</script>
